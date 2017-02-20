@@ -46,9 +46,17 @@ public:
 	Interpolation ();
 	Interpolation (char* inputFile1, char* inputFile2);
 	~Interpolation ();
-	void showInputPoints();
+	void showInputPoints(); 
 	void showOutputPoints();
 	void interpolate();
+	void changeInterpolationType(InterpolationType itype)
+	{
+		this->interpolationType_ = itype;
+	}
+	InterpolationType getIType()
+	{
+		return this->interpolationType_;
+	}
 
 };
 

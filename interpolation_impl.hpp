@@ -80,7 +80,7 @@ void Interpolation<T>::showOutputPoints()
 }
 
 template <typename T>
-void Interpolation<T>::interpolate()
+void Interpolation<T>::interpolate(  )
 {
 	switch ( interpolationType_ )
 	{
@@ -116,16 +116,59 @@ void Interpolation<T>::interpolate()
 					}
 				}
 				else 
-					throw Exception ( 2, "Something goes badly!" );
+					throw Exception ( 2, "It's just impossible!" );
 			}
 
 			done_ = true;
 		}
 		break;
 		
-		case quadratic: 
+		case quadratic: 	// f(x) = a0 + a1*x + a2*x^2 
 		{
+			size_t ic = 0;
+			size_t oc = 0;
 
+
+			T dy31 = iP[ic+2].fx - iP[ic].fx;
+			T dy21 = iP[ic+1].fx - iP[ic].fx;
+			T dx31 = iP[ic+2].x - iP[ic].x;
+			T dx21 = iP[ic+1].x - iP[ic].x;
+			T dx32 = iP[ic+2].x - iP[ic+1].x;
+
+			T a2 = dy31 / ( dx31 * dx32 ) - dy21 / ( dx21 * dx32 );
+			T a1 = dy21 / dx21 - a2 * ( iP[ic+1].x + iP[ic].x);
+			T a0 = iP[ic].fx - a1 * iP[ic].x - a2 * iP[ic].x * iP[ic].x;
+
+			while ( oc < outputNumber_ )
+			{
+				if ( oP[oc].x > iP[ic].x )
+				{
+					if ( oP[oc].x < iP[ic+2].x )
+					{
+						// interpolate
+						oP[oc].fx = a0 + a1 * oP[oc].x + a2 * oP[oc].x * oP[oc].x;
+						++oc;
+					}
+					else
+					{
+						ic+=2;
+
+						dy31 = iP[ic+2].fx - iP[ic].fx;
+						dy21 = iP[ic+1].fx - iP[ic].fx;
+						dx31 = iP[ic+2].x - iP[ic].x;
+						dx21 = iP[ic+1].x - iP[ic].x;
+						dx32 = iP[ic+2].x - iP[ic+1].x;
+
+						a2 = dy31 / ( dx31 * dx32 ) - dy21 / ( dx21 * dx32 );
+						a1 = dy21 / dx21 - a2 * ( iP[ic+1].x + iP[ic].x);
+						a0 = iP[ic].fx - a1 * iP[ic].x - a2 * iP[ic].x * iP[ic].x;
+					}
+				}
+				else Exception ( 3, "It's just impossible!" );
+
+			}
+
+			done_ = true;
 		}
 		break;
 		case cubic: 
@@ -138,7 +181,6 @@ void Interpolation<T>::interpolate()
 		break;
 	}
 }
-
 
 
 
