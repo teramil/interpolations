@@ -31,8 +31,12 @@ class Interpolation
 private:
 	struct Point
 	{	
-		T x;
-		T fx;
+		T x, fx;
+	};
+
+	struct CubicSpline
+	{
+		T a, b, c, d, x;
 	};
 
 	size_t inputNumber_; 	// the number of inuput points
@@ -49,16 +53,23 @@ public:
 	void showInputPoints(); 
 	void showOutputPoints();
 	void interpolate();
+	
 	void changeInterpolationType(InterpolationType itype)
 	{
 		this->interpolationType_ = itype;
 	}
+	
 	InterpolationType getIType()
 	{
 		return this->interpolationType_;
 	}
 
+private:
+	void buildCubicSpline(CubicSpline * splines);
+
 };
+
+
 
 #include "interpolation_impl.hpp"
  

@@ -27,7 +27,7 @@ Interpolation<T>::Interpolation(char* inputFile1, char* inputFile2)
 		outputNumber_ = atoi(buff);
 		oP = new Point[outputNumber_];
 
-		for ( int i = 0; i < inputNumber_; i++ )
+		for ( std::size_t i = 0; i < inputNumber_; ++i )
 		{
 			fin1 >> buff;
 		 iP[i].x = (T)atof(buff);
@@ -36,7 +36,7 @@ Interpolation<T>::Interpolation(char* inputFile1, char* inputFile2)
 		 iP[i].fx = (T)atof(buff);
 		}
 
-		for ( int i = 0; i < outputNumber_; i++ )
+		for ( std::size_t i = 0; i < outputNumber_; ++i )
 		{
 			fin2 >> buff;
 			oP[i].x = (T)atof(buff);
@@ -62,7 +62,7 @@ Interpolation<T>::~Interpolation()
 template <typename T>
 void Interpolation<T>::showInputPoints()
 {
-	for ( int i = 0; i < inputNumber_; i++ )
+	for ( std::size_t i = 0; i < inputNumber_; ++i )
 		std::cout << iP[i].x << " " << iP[i].fx << std::endl;
 }
 
@@ -75,12 +75,62 @@ void Interpolation<T>::showOutputPoints()
 		return;
 	}
 
-	for ( int i = 0; i < outputNumber_; i++ )
+	for ( std::size_t i = 0; i < outputNumber_; ++i )
 		std::cout << oP[i].x << " " << oP[i].fx << std::endl;
 }
 
 template <typename T>
-void Interpolation<T>::interpolate(  )
+void Interpolation<T>::buildCubicSpline(CubicSpline * splines) // Из википедии стырил :|
+{
+	splines = new CubicSpline[inputNumber_];
+
+	for (std::size_t i = 0; i < inputNumber_; ++i)
+	{
+		splines[i].x = iP[i].x;
+		splines[i].a = iP[i].fx;
+	}
+	splines[0].c = 0.;
+
+	T *alpha = new T[inputNumber_ - 1];
+	T *beta = new T[inputNumber_ - 1];
+
+	T A, B, C, F, h_i, h_i1, z;
+
+	alpha[0] = beta[0] = 0.;
+
+	for ( std::size_t i = 1; i < inputNumber_ - 1; ++i )
+	{
+		h_i = iP[i].x - iP[i - 1].x;
+		h_i1 = iP[i + 1].x - iP[i].x;
+
+		A = h_i;
+		C = 2. * (h_i + h_i1);
+		B = h_i1;
+		F = 6. * ((iP[i + 1].fx - iP[i].fx) / h_i1 - (iP[i].fx - iP[i - 1].fx) / h_i);
+		z = (A * alpha[i - 1] + C);
+
+		alpha[i] = -B / z;
+		beta[i] = (F - A * beta[i - 1]) / z;
+	}
+
+	splines[inputNumber_ - 1].c = (F - A * beta[inputNumber_ - 2]) / (C + A * alpha[inputNumber_ - 2]);
+
+	for ( std::size_t i = inputNumber_ - 2; i > 0; --i )
+		splines[i].c = alpha[i] * splines[i + 1].c + beta[i];
+
+	delete[] beta;
+	delete[] alpha;
+
+	for ( std::size_t i = inputNumber_ - 1; i > 0; --i )
+	{
+		double h_i = iP[i].x - iP[i - 1].x;
+		splines[i].d = (splines[i].c - splines[i - 1].c) / h_i;
+		splines[i].b = h_i * (2. * splines[i].c + splines[i - 1].c) / 6. + (iP[i].fx - iP[i - 1].fx) / h_i;
+	}
+}
+
+template <typename T>
+void Interpolation<T>::interpolate()
 {
 	switch ( interpolationType_ )
 	{
@@ -123,7 +173,7 @@ void Interpolation<T>::interpolate(  )
 		}
 		break;
 		
-		case quadratic: 	// f(x) = a0 + a1*x + a2*x^2 
+		case quadratic:
 		{
 			size_t ic = 0;
 			size_t oc = 0;
@@ -134,6 +184,9 @@ void Interpolation<T>::interpolate(  )
 			T dx31 = iP[ic+2].x - iP[ic].x;
 			T dx21 = iP[ic+1].x - iP[ic].x;
 			T dx32 = iP[ic+2].x - iP[ic+1].x;
+
+			if (dx32 == 0 || dx21 == 0 || dx31 == 0)
+				throw Exception ( 4, "Devision by zero!" );
 
 			T a2 = dy31 / ( dx31 * dx32 ) - dy21 / ( dx21 * dx32 );
 			T a1 = dy21 / dx21 - a2 * ( iP[ic+1].x + iP[ic].x);
@@ -151,13 +204,16 @@ void Interpolation<T>::interpolate(  )
 					}
 					else
 					{
-						ic+=2;
+						++ic;
 
 						dy31 = iP[ic+2].fx - iP[ic].fx;
 						dy21 = iP[ic+1].fx - iP[ic].fx;
 						dx31 = iP[ic+2].x - iP[ic].x;
 						dx21 = iP[ic+1].x - iP[ic].x;
 						dx32 = iP[ic+2].x - iP[ic+1].x;
+
+						if (dx32 == 0 || dx21 == 0 || dx31 == 0)
+							throw Exception ( 5, "Devision by zero!" );
 
 						a2 = dy31 / ( dx31 * dx32 ) - dy21 / ( dx21 * dx32 );
 						a1 = dy21 / dx21 - a2 * ( iP[ic+1].x + iP[ic].x);
@@ -171,14 +227,43 @@ void Interpolation<T>::interpolate(  )
 			done_ = true;
 		}
 		break;
-		case cubic: 
+
+		case cubic:
 		{
+			CubicSpline * splines;
+			buildCubicSpline(splines);
 
+			std::size_t oc = 0;
+			std::size_t ic = 0;
+
+			while ( oc < outputNumber_ )
+			{
+				if ( oP[oc].x > iP[ic].x )
+				{
+					if ( oP[oc].x < iP[ic+2].x )
+					{
+						// interpolate
+						T dx = (oP[oc].x - splines[ic].x);
+
+						oP[oc].fx = splines[ic].a + (splines[ic].b + 
+							(splines[ic].c / 2. + splines[ic].d * dx / 6.) * dx) * dx;
+						
+						++oc;
+					}
+					else
+					{
+						++ic;
+					}
+				}
+				else Exception ( 6, "It's just impossible!" );
+
+			}
+
+			done_ = true;
 		}
-
 		break;
-		default:
-		break;
+		
+		default: { }
 	}
 }
 
